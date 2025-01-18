@@ -7,7 +7,7 @@ Az adatokat Firebasebe menti el. <br>
 Backend: Python / Flask<br>
 Frontend: nativ Javascript <br>
 Firebase Auth: Anonymus<br>
-OpenAi: Dall-E 3<br><br>
+OpenAi: Dall-E 3<br>
 Gemini: 2.0 Flash Experimental<br>
 <br>
 Telepítés: pip install -r requirements.txt<br>
