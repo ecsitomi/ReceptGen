@@ -14,7 +14,7 @@
     
     <div class="container col-12">
         <p id="auth-status">Bejelentkezési státusz: Ismeretlen</p>
-        <button id="auth-button" disabled>Bejelentkezés</button>
+        <!-- <button id="auth-button" disabled>Bejelentkezés</button> -->
     
         <form id="ingredient-form" style="margin-top: 20px;">
             <div class="row mb-3">
@@ -97,7 +97,8 @@
                     authButton.disabled = false;
                 });
 
-                // Bejelentkezés gomb eseménykezelő
+                /*
+                // Bejelentkezés gomb eseménykezelő - Egyelőre nem használjuk
                 authButton.addEventListener("click", () => {
                     if (auth.currentUser) {
                         auth.signOut();
@@ -107,6 +108,7 @@
                         });
                     } 
                 });
+                */
 
                 // Hozzáadjuk a kép generálás funkciót
                 const form = document.getElementById("ingredient-form");
