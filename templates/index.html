@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recept Generátor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style></style>
+</head>
+<body>
+    <header class="container-fluid col-12"> <div class="row"> <div class="text-center mb-4"> <h1>Ecsedi Tamás Recept Generátora</h1> </div> </div> </header>
+    
+    <div class="container col-12">
+        <p id="auth-status">Bejelentkezési státusz: Ismeretlen</p>
+        <button id="auth-button" disabled>Bejelentkezés</button>
+    
+        <form id="ingredient-form" style="margin-top: 20px;">
+            <div class="row mb-3">
+                <div class="col">
+                    <div class="input-group input-group-sm">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text" id="inputGroup-sizing-sm">Hozzávaló 1</span>
+                        </div>
+                        <input type="text" id="ingredient1" class="form-control" placeholder="Hozzávaló 1" required aria-label="Hozzávaló 1" aria-describedby="inputGroup-sizing-sm">
+                    </div>
+                </div>
+                
+                <div class="col">
+                    <div class="input-group input-group-sm">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text" id="inputGroup-sizing-sm">Hozzávaló 2</span>
+                        </div>
+                        <input type="text" id="ingredient2" class="form-control" placeholder="Hozzávaló 2" aria-label="Hozzávaló 2" aria-describedby="inputGroup-sizing-sm">
+                    </div>
+                </div>
+        
+                <div class="col">
+                    <div class="input-group input-group-sm">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text" id="inputGroup-sizing-sm">Hozzávaló 3</span>
+                        </div>
+                        <input type="text" id="ingredient3" class="form-control" placeholder="Hozzávaló 3" aria-label="Hozzávaló 3" aria-describedby="inputGroup-sizing-sm">
+                    </div>
+                </div>
+        
+                <div class="col">
+                    <button type="submit" class="btn btn-primary w-100">Varázsolj</button>
+                </div>
+            </div>
+        </form>
+        
+        
+        <h4>Jó étvágyat!</h4>
+        <div id="output" class="row align-items-start">
+            <div class="col-md-6">
+                <img id="generated-image" src="" alt="Generált Recept kép" class="img-fluid" style="display: none;">
+            </div>
+            <div class="col-md-6">
+                <p id="recept"></p>
+            </div>
+        </div>
+    </div>
+
+    <!--Firebase SDK-->
+    <script src="https://www.gstatic.com/firebasejs/11.2.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.2.0/firebase-auth-compat.js"></script>
+
+    <script> /* Firebase init, auth, ai generálás, feltöltés */
+        async function initializeFirebase() {         
+            try {
+                const response = await fetch("/firebase_config");
+                if (!response.ok) {
+                    throw new Error(`Hiba a Firebase konfiguráció betöltésekor! HTTP státusz: ${response.status}`);
+                }
+                const firebaseConfig = await response.json();
+                firebase.initializeApp(firebaseConfig);
+
+                // Firebase obejktumok
+                const auth = firebase.auth();
+                const db = firebase.firestore();
+
+                // Anonim bejelentkezés
+                const authButton = document.getElementById("auth-button");
+                const authStatus = document.getElementById("auth-status");
+
+                auth.onAuthStateChanged(user => {
+                    if (user) {
+                        authStatus.textContent = `Bejelentkezve (UID: ${user.uid})`;
+                        authButton.textContent = "Kijelentkezés";
+                    } else {
+                        authStatus.textContent = "Nincs bejelentkezve";
+                        authButton.textContent = "Bejelentkezés";
+                    }
+                    authButton.disabled = false;
+                });
+
+                // Bejelentkezés gomb eseménykezelő
+                authButton.addEventListener("click", () => {
+                    if (auth.currentUser) {
+                        auth.signOut();
+                    } else {
+                        auth.signInAnonymously().catch(err => {
+                            alert("Hiba a bejelentkezés során: " + err.message);
+                        });
+                    } 
+                });
+
+                // Hozzáadjuk a kép generálás funkciót
+                const form = document.getElementById("ingredient-form");
+                form.addEventListener("submit", async (event) => {
+                    event.preventDefault();
+
+                    const ingredients = [
+                        document.getElementById("ingredient1").value,
+                        document.getElementById("ingredient2").value,
+                        document.getElementById("ingredient3").value
+                    ].filter(ing => ing);
+
+                    try {
+                        const response = await fetch("/generate_image", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify({ ingredients })
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`Hiba a kép generálása közben! HTTP státusz: ${response.status}`);
+                        }
+
+                        /* A Firebase-ből való kép lekérés nem működik, mert a tokeneket még nem állítottam be
+                        
+                        const data = await response.json();
+                        const docRef = db.collection("generated_images").doc(data.image_id);
+                        const docSnap = await docRef.get();
+
+                        if (docSnap.exists) { 
+                            const imageData = docSnap.data();
+                            const img = document.getElementById("generated-image");
+                            img.style.display = "block";
+                            img.src = imageData.image_url;
+                        } else {
+                            alert("A kép generálása sikertelen volt.");
+                        }
+                        */
+                        
+                        // AI kontent megjelenítése
+                        const data = await response.json();
+                        const img = document.getElementById("generated-image");
+                        img.style.display = "block";
+                        img.src = data.openai_img_url; 
+
+                        const recept = document.getElementById("recept");
+                        recept.textContent = data.recept;
+
+                    } catch (error) {
+                        alert("Hiba történt: " + error.message);
+                    }
+                });
+            } catch (error) {
+                alert("Hiba történt az alkalmazás inicializálásakor: " + error.message);
+            }
+        }
+
+        initializeFirebase();
+    </script>
+</body>
+</html>

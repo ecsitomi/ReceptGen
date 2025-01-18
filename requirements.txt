@@ -1,0 +1,6 @@
+flask
+firebase-admin
+openai
+python-dotenv
+google-generativeai
+google-genai
